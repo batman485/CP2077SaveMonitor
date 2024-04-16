@@ -17,6 +17,7 @@ Cyberpunk 2077 Save Monitor was built on Electron Forge which uses Makers that a
 
 ### How to Build
 1. If you just downloaded or cloned the repository, run the install command to download the dependencies:
+
     yarn
     ```
     yarn install
@@ -25,7 +26,8 @@ Cyberpunk 2077 Save Monitor was built on Electron Forge which uses Makers that a
     ```
     npm install
     ```
-2. Run the make command to create the distribution package:
+3. Run the make command to create the distribution package:
+
     yarn
     ```
     yarn make
@@ -34,4 +36,4 @@ Cyberpunk 2077 Save Monitor was built on Electron Forge which uses Makers that a
     ```
     npm make
     ```
-3. This will create the distrbution packages that are defined in the makers section of the package.json.
+4. This will create the distrbution packages that are defined in the makers section of the package.json.

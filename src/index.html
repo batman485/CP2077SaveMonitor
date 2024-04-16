@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Cyberpunk 2077 Save Monitor</title>
+    <link rel="stylesheet" href="css/index.css">
+  </head>
+  <body>
+    <div id="main">
+      <div id="sidebar" class="flex-item">
+        <img id="logo" src="images/cp_logo.png" />
+        <button id="folder-select" onClick="openFolderSelect()">Save Location</button>
+      </div>
+      <div id="info">
+        <p id="folder" title="">Select a Save Location</p>
+        <ul id="saves">
+          <li>
+            <p>No saves found</p>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <script>
+      const electron = require('electron');
+      const {ipcRenderer} = electron;
+      const chokidar = require("chokidar");
+
+      const bytesInMB = 1048576;
+      const sizeWarning = bytesInMB * 7.5;
+
+      let saveFolderLocation = '';
+      let saveFiles = {};
+      let pathSeperator = '/';
+
+      document.addEventListener("DOMContentLoaded", () => {
+        pathSeperator = ipcRenderer.sendSync('folder:sep');
+
+        let saveLocation = ipcRenderer.sendSync('folder:get');
+        if(saveLocation !== '')
+          updateSaveLocation(saveLocation);
+      });
+
+      ipcRenderer.on('folder:change', (event, folder) => {
+        if(folder && folder !== '')
+          updateSaveLocation(folder);
+      });
+
+      function openFolderSelect() {
+        ipcRenderer.send('folder:open');
+      }
+      function openNotification(save, size) {
+        ipcRenderer.send('notification:show', save, size);
+      }
+
+      function updateSaveLocation(folder) {
+        saveFolderLocation = folder;
+
+        document.getElementById("folder").innerHTML = saveFolderLocation;
+        document.getElementById("folder").setAttribute("title", saveFolderLocation);
+
+        startWatcher(saveFolderLocation);
+      }
+
+      function updateSaves() {
+        const saves = document.getElementById("saves");
+
+        let saveLi = '';
+
+        Object.keys(saveFiles).forEach(saveName => {
+          const saveFile = saveFiles[saveName];
+          const sizeInMB = (saveFile.size / bytesInMB).toFixed(2);
+          const usedPercent = Math.round(((saveFile.size / (bytesInMB * 8)) * 100)  * 10 ) /10 + '%'
+
+          saveLi += '<li' + ((saveFile.size > sizeWarning) ? ' class="warning" ' : '') + '>' +
+                    ' <p>' + saveFile.name + '<span class="size">' + sizeInMB + ' of 8 MB</span></p>' +
+                    '  <div class="progress-bar">' +
+                    '    <span style="width: ' + usedPercent + '"></span>' +
+                    '  </div>' +
+                    '</li>';
+        });
+
+        saves.innerHTML = '';
+        saves.insertAdjacentHTML('afterbegin', saveLi);
+      }
+
+      function startWatcher(path) {
+        let isReady = false;
+        var watcher = chokidar.watch(path, {
+            ignored: /(^|[\/\\])\../,
+            persistent: true
+        });
+
+        watcher.on('add', (path, stats) => {
+          if(path.endsWith("sav.dat")) {
+            let saveName = path.split(pathSeperator).slice(-2)[0];
+            saveFiles[saveName] = {
+              'name': saveName,
+              'size': stats.size
+            }
+
+            if(isReady) {
+              console.log(saveName + ': ' + stats.size);
+
+              if(stats.size > sizeWarning)
+                openNotification(saveName, (stats.size / bytesInMB).toFixed(2));
+
+              updateSaves();
+            }
+          }
+        })
+        .on('change', (path, stats) => {
+          if(path.endsWith("sav.dat")) {
+            let saveName = path.split(pathSeperator).slice(-2)[0];
+            saveFiles[saveName] = {
+              'name': saveName,
+              'size': stats.size
+            }
+
+            if(isReady) {
+              console.log(saveName + ': ' + stats.size);
+
+              if(stats.size > sizeWarning)
+                openNotification(saveName, (stats.size / bytesInMB).toFixed(2));
+
+              updateSaves();
+            }
+          }
+        })
+        .on('unlink', path => {
+          if(path.endsWith("sav.dat")) {
+            let saveName = path.split(pathSeperator).slice(-2)[0];
+            delete saveFiles[saveName];
+
+            if(isReady) updateSaves();
+          }
+        })
+        .on('ready', ()=> {
+          isReady = true;
+          updateSaves();
+        });
+      }
+    </script>
+  </body>
+</html>
